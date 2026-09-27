@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Actuator Remote</title>
+<!-- MQTT over secure WebSockets -->
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5/dist/mqtt.min.js"></script>
+<style>
+  :root { --bg:#111; --card:#1c1c1c; --fg:#eee; --muted:#999; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--fg); }
+  main { max-width:380px; margin:0 auto; padding:20px 16px 40px; }
+  h1 { font-size:22px; text-align:center; margin:8px 0 18px; }
+  .card { background:var(--card); border-radius:14px; padding:16px; margin-bottom:16px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px; }
+  input { width:100%; padding:12px; font-size:16px; border-radius:8px; border:1px solid #333; background:#0d0d0d; color:var(--fg); }
+  .row { display:flex; align-items:center; gap:8px; margin-top:12px; font-size:14px; color:var(--muted); }
+  .row input { width:auto; }
+  button { display:block; width:100%; padding:20px; margin:12px 0; font-size:22px; font-weight:600; border:0; border-radius:12px; color:#fff; cursor:pointer; }
+  button:disabled { opacity:.35; cursor:not-allowed; }
+  .connect { background:#555; font-size:18px; padding:14px; }
+  .e { background:#2e7d32; } .r { background:#1565c0; } .s { background:#c62828; }
+  .status { display:flex; justify-content:space-between; font-size:15px; }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#777; margin-right:6px; }
+  .on { background:#4caf50; } .off { background:#e53935; }
+  #state { font-size:28px; font-weight:700; text-align:center; margin:14px 0 4px; }
+  .small { font-size:12px; color:var(--muted); text-align:center; }
+  .link { background:none; color:var(--muted); font-size:14px; padding:6px; margin:0; font-weight:400; text-decoration:underline; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Linear Actuator</h1>
+
+  <!-- Login -->
+  <div class="card" id="login">
+    <label>HiveMQ cluster URL</label>
+    <input id="host" placeholder="xxxxxxxx.s1.eu.hivemq.cloud" autocapitalize="off" autocorrect="off">
+    <label>Username</label>
+    <input id="user" autocapitalize="off" autocorrect="off">
+    <label>Password</label>
+    <input id="pass" type="password">
+    <label>Device ID</label>
+    <input id="dev" value="actuator1" autocapitalize="off" autocorrect="off">
+    <div class="row"><input type="checkbox" id="remember"> <span>Remember on this device</span></div>
+    <button class="connect" id="connectBtn">Connect</button>
+    <div class="small" id="loginMsg"></div>
+  </div>
+
+  <!-- Controls -->
+  <div id="controls" hidden>
+    <div class="card">
+      <div class="status">
+        <span><span class="dot" id="brokerDot"></span>Cloud</span>
+        <span><span class="dot" id="devDot"></span><span id="devText">Device: ?</span></span>
+      </div>
+      <div id="state">—</div>
+      <div class="small" id="updated">&nbsp;</div>
+    </div>
+    <button class="e" data-cmd="extend">Extend</button>
+    <button class="r" data-cmd="retract">Retract</button>
+    <button class="s" data-cmd="stop">Stop</button>
+    <button class="link" id="logout">Log out</button>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const KEY = 'actuatorLogin';
+let client = null, dev = 'actuator1';
+
+// Load saved login (optional convenience; never required)
+try {
+  const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+  if (saved) { $('host').value = saved.host; $('user').value = saved.user; $('pass').value = saved.pass; $('dev').value = saved.dev; $('remember').checked = true; }
+} catch (e) {}
+
+function setCmdEnabled(on) {
+  document.querySelectorAll('[data-cmd]').forEach(b => b.disabled = !on);
+}
+
+function connect() {
+  const host = $('host').value.trim(), user = $('user').value.trim(), pass = $('pass').value;
+  dev = $('dev').value.trim() || 'actuator1';
+  if (!host || !user || !pass) { $('loginMsg').textContent = 'Fill in all fields.'; return; }
+
+  try {
+    if ($('remember').checked) localStorage.setItem(KEY, JSON.stringify({ host, user, pass, dev }));
+    else localStorage.removeItem(KEY);
+  } catch (e) {}
+
+  $('loginMsg').textContent = 'Connecting…';
+  if (client) client.end(true);
+  client = mqtt.connect(`wss://${host}:8884/mqtt`, {
+    username: user, password: pass,
+    clientId: 'web-' + Math.random().toString(16).slice(2, 10),
+    reconnectPeriod: 3000, connectTimeout: 10000, clean: true
+  });
+
+  client.on('connect', () => {
+    $('login').hidden = true; $('controls').hidden = false; $('loginMsg').textContent = '';
+    $('brokerDot').className = 'dot on';
+    client.subscribe([`${dev}/state`, `${dev}/online`], { qos: 1 });
+  });
+  client.on('reconnect', () => { $('brokerDot').className = 'dot off'; setCmdEnabled(false); });
+  client.on('close',     () => { $('brokerDot').className = 'dot off'; setCmdEnabled(false); });
+  client.on('error', err => {
+    $('loginMsg').textContent = 'Error: ' + (err.message || err);
+    if (/auth|Not authorized|Bad user/i.test(err.message || '')) { client.end(true); $('login').hidden = false; $('controls').hidden = true; }
+  });
+  client.on('message', (topic, payload) => {
+    const msg = payload.toString();
+    if (topic === `${dev}/online`) {
+      const on = msg === 'online';
+      $('devDot').className = 'dot ' + (on ? 'on' : 'off');
+      $('devText').textContent = 'Device: ' + (on ? 'online' : 'offline');
+      setCmdEnabled(on);
+    } else if (topic === `${dev}/state`) {
+      $('state').textContent = msg;
+      $('updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    }
+  });
+}
+
+document.querySelectorAll('[data-cmd]').forEach(b =>
+  b.addEventListener('click', () => { if (client && client.connected) client.publish(`${dev}/cmd`, b.dataset.cmd, { qos: 1 }); })
+);
+$('connectBtn').addEventListener('click', connect);
+$('logout').addEventListener('click', () => {
+  if (client) client.end(true);
+  try { localStorage.removeItem(KEY); } catch (e) {}
+  $('pass').value = ''; $('remember').checked = false;
+  $('controls').hidden = true; $('login').hidden = false;
+});
+setCmdEnabled(false);
+
+// Auto-connect if login was saved
+if ($('remember').checked) connect();
+</script>
+</body>
+</html>
