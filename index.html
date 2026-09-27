@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>Actuator Remote</title>
 <!-- MQTT over secure WebSockets -->
 <script src="https://cdn.jsdelivr.net/npm/mqtt@5/dist/mqtt.min.js"></script>
@@ -19,6 +19,8 @@
   .row input { width:auto; }
   button { display:block; width:100%; padding:20px; margin:12px 0; font-size:22px; font-weight:600; border:0; border-radius:12px; color:#fff; cursor:pointer; }
   button:disabled { opacity:.35; cursor:not-allowed; }
+  [data-cmd] { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; touch-action:none; padding:30px 20px; }
+  [data-cmd].held { filter:brightness(1.35); transform:scale(.98); }
   .connect { background:#555; font-size:18px; padding:14px; }
   .e { background:#2e7d32; } .r { background:#1565c0; } .s { background:#c62828; }
   .status { display:flex; justify-content:space-between; font-size:15px; }
@@ -58,9 +60,9 @@
       <div id="state">—</div>
       <div class="small" id="updated">&nbsp;</div>
     </div>
-    <button class="e" data-cmd="extend">Extend</button>
-    <button class="r" data-cmd="retract">Retract</button>
-    <button class="s" data-cmd="stop">Stop</button>
+    <button class="e" data-cmd="extend">Hold to Extend</button>
+    <button class="r" data-cmd="retract">Hold to Retract</button>
+    <button class="s" id="stopBtn">Stop</button>
     <button class="link" id="logout">Log out</button>
   </div>
 </main>
@@ -77,7 +79,27 @@ try {
 } catch (e) {}
 
 function setCmdEnabled(on) {
-  document.querySelectorAll('[data-cmd]').forEach(b => b.disabled = !on);
+  document.querySelectorAll('[data-cmd], #stopBtn').forEach(b => b.disabled = !on);
+  if (!on) endHold(false);
+}
+
+function send(cmd, qos) {
+  if (client && client.connected) client.publish(`${dev}/cmd`, cmd, { qos });
+}
+
+// ---- Press-and-hold: repeat the command every 250 ms while held; send "stop" on release ----
+let holdTimer = null, heldBtn = null;
+function startHold(b) {
+  if (heldBtn || b.disabled) return;
+  heldBtn = b; b.classList.add('held');
+  send(b.dataset.cmd, 1);
+  holdTimer = setInterval(() => send(b.dataset.cmd, 0), 250);
+}
+function endHold(sendStop = true) {
+  if (!heldBtn) return;
+  clearInterval(holdTimer); holdTimer = null;
+  heldBtn.classList.remove('held'); heldBtn = null;
+  if (sendStop) send('stop', 1);
 }
 
 function connect() {
@@ -123,9 +145,15 @@ function connect() {
   });
 }
 
-document.querySelectorAll('[data-cmd]').forEach(b =>
-  b.addEventListener('click', () => { if (client && client.connected) client.publish(`${dev}/cmd`, b.dataset.cmd, { qos: 1 }); })
-);
+document.querySelectorAll('[data-cmd]').forEach(b => {
+  b.addEventListener('pointerdown', e => { e.preventDefault(); b.setPointerCapture(e.pointerId); startHold(b); });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => b.addEventListener(ev, () => endHold()));
+  b.addEventListener('contextmenu', e => e.preventDefault());
+});
+$('stopBtn').addEventListener('click', () => { endHold(false); send('stop', 1); });
+// Safety: stop if the page is hidden, the phone locks, or the window loses focus
+document.addEventListener('visibilitychange', () => { if (document.hidden) endHold(); });
+window.addEventListener('blur', () => endHold());
 $('connectBtn').addEventListener('click', connect);
 $('logout').addEventListener('click', () => {
   if (client) client.end(true);
