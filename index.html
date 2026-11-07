@@ -1,170 +1,1772 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Actuator Remote</title>
-<!-- MQTT over secure WebSockets -->
-<script src="https://cdn.jsdelivr.net/npm/mqtt@5/dist/mqtt.min.js"></script>
-<style>
-  :root { --bg:#111; --card:#1c1c1c; --fg:#eee; --muted:#999; }
-  * { box-sizing:border-box; }
-  body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--fg); }
-  main { max-width:380px; margin:0 auto; padding:20px 16px 40px; }
-  h1 { font-size:22px; text-align:center; margin:8px 0 18px; }
-  .card { background:var(--card); border-radius:14px; padding:16px; margin-bottom:16px; }
-  label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px; }
-  input { width:100%; padding:12px; font-size:16px; border-radius:8px; border:1px solid #333; background:#0d0d0d; color:var(--fg); }
-  .row { display:flex; align-items:center; gap:8px; margin-top:12px; font-size:14px; color:var(--muted); }
-  .row input { width:auto; }
-  button { display:block; width:100%; padding:20px; margin:12px 0; font-size:22px; font-weight:600; border:0; border-radius:12px; color:#fff; cursor:pointer; }
-  button:disabled { opacity:.35; cursor:not-allowed; }
-  [data-cmd] { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; touch-action:none; padding:30px 20px; }
-  [data-cmd].held { filter:brightness(1.35); transform:scale(.98); }
-  .connect { background:#555; font-size:18px; padding:14px; }
-  .e { background:#2e7d32; } .r { background:#1565c0; } .s { background:#c62828; }
-  .status { display:flex; justify-content:space-between; font-size:15px; }
-  .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:#777; margin-right:6px; }
-  .on { background:#4caf50; } .off { background:#e53935; }
-  #state { font-size:28px; font-weight:700; text-align:center; margin:14px 0 4px; }
-  .small { font-size:12px; color:var(--muted); text-align:center; }
-  .link { background:none; color:var(--muted); font-size:14px; padding:6px; margin:0; font-weight:400; text-decoration:underline; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Bolt Pattern Analyzer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #1e1e2e, #2d1b69);
+            color: #f3f4f6;
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: linear-gradient(145deg, #2a2a3a, #323247);
+            border-radius: 25px;
+            padding: 25px;
+            min-height: calc(100vh - 40px);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 25px;
+            background: linear-gradient(135deg, #60a5fa, #3b82f6, #1d4ed8);
+            border-radius: 20px;
+            color: white;
+            box-shadow: 0 15px 35px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            font-size: clamp(1.8em, 4vw, 2.2em);
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: clamp(1em, 2.5vw, 1.1em);
+            opacity: 0.9;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 380px 1fr 400px;
+            gap: 25px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .panel {
+            background: linear-gradient(145deg, #35354a, #3f3f57);
+            border-radius: 20px;
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .control-panel {
+            overflow-y: auto;
+        }
+
+        .visualization-panel {
+            min-height: 0;
+        }
+
+        .results-panel {
+            overflow-y: auto;
+        }
+
+        .results-panel > h3 {
+            color: #60a5fa;
+            margin-bottom: 16px;
+            font-size: clamp(1.1em, 2.5vw, 1.3em);
+            border-bottom: 2px solid #60a5fa;
+            padding-bottom: 10px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .card {
+            background: linear-gradient(145deg, #2a2a3a, #36364d);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .card h3 {
+            color: #60a5fa;
+            margin-bottom: 20px;
+            font-size: clamp(1.1em, 2.5vw, 1.3em);
+            border-bottom: 2px solid #60a5fa;
+            padding-bottom: 10px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .input-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .input-row label {
+            color: #d1d5db;
+            font-weight: 500;
+            font-size: clamp(0.9em, 2vw, 1em);
+        }
+
+        .input-row input, .input-row select {
+            background: linear-gradient(145deg, #1e1e2e, #252539);
+            border: 1px solid #4b5563;
+            border-radius: 10px;
+            padding: 10px 15px;
+            color: #f3f4f6;
+            width: 130px;
+            font-size: clamp(13px, 2vw, 14px);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .input-row input:focus, .input-row select:focus {
+            outline: none;
+            border-color: #60a5fa;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 0 3px rgba(96, 165, 250, 0.2), 0 1px 0 rgba(255, 255, 255, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .input-row input.error {
+            border-color: #ef4444;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 0 3px rgba(239, 68, 68, 0.3), 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .error-message {
+            position: absolute;
+            bottom: -25px;
+            right: 0;
+            color: #ef4444;
+            font-size: 0.75em;
+            background: rgba(239, 68, 68, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: none;
+            white-space: nowrap;
+        }
+
+        .mmc-toggle {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .mmc-button {
+            background: linear-gradient(145deg, #3b82f6, #2563eb);
+            border: none;
+            border-radius: 12px;
+            padding: 12px 24px;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .mmc-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        .mmc-settings {
+            transition: all 0.3s ease;
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            margin-bottom: 0;
+        }
+
+        .mmc-settings.visible {
+            max-height: 200px;
+            opacity: 1;
+            margin-bottom: 20px;
+        }
+
+        .mmc-note {
+            text-align: center;
+            color: #9ca3af;
+            font-size: 0.9em;
+            font-style: italic;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .positions-grid {
+            display: grid;
+            gap: 15px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .hole-inputs {
+            background: linear-gradient(145deg, #1e1e2e, #252539);
+            border-radius: 12px;
+            padding: 15px;
+            border: 1px solid #4b5563;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .hole-inputs h4 {
+            color: #60a5fa;
+            margin-bottom: 12px;
+            font-size: clamp(0.95em, 2vw, 1.1em);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .coordinate-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            align-items: end;
+        }
+
+        .coordinate-inputs div {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .coordinate-inputs label {
+            font-size: clamp(11px, 2vw, 12px);
+            color: #d1d5db;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.2;
+            min-height: 2.4em;
+            display: flex;
+            align-items: flex-end;
+            font-weight: 500;
+        }
+
+        .coordinate-inputs input {
+            width: 100%;
+        }
+
+        .results-summary {
+            background: linear-gradient(145deg, #059669, #10b981);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .results-summary.fail {
+            background: linear-gradient(145deg, #dc2626, #ef4444);
+            box-shadow: 0 8px 16px rgba(220, 38, 38, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        .export-bar {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .export-button {
+            background: linear-gradient(145deg, #10b981, #059669);
+            border: none;
+            border-radius: 12px;
+            padding: 12px 28px;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 16px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .export-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 20px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        .export-button:active {
+            transform: translateY(0);
+        }
+
+        .export-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results-summary h4 {
+            color: white;
+            font-size: clamp(1em, 2.2vw, 1.1em);
+            margin-bottom: 8px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .summary-values {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .summary-item {
+            background: rgba(255, 255, 255, 0.25);
+            border-radius: 8px;
+            padding: 8px;
+            text-align: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .summary-item .label {
+            font-size: clamp(0.8em, 1.8vw, 0.85em);
+            opacity: 0.8;
+        }
+
+        .summary-item .value {
+            font-size: clamp(1em, 2.2vw, 1.1em);
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+        }
+
+        .tolerance-indicators {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .tolerance-indicator {
+            background: linear-gradient(145deg, #2a2a3a, #36364d);
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .tolerance-indicator h5 {
+            color: #60a5fa;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+
+        .tolerance-visual {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 10px;
+            position: relative;
+            border-radius: 50%;
+            background: #374151;
+            border: 2px solid #6b7280;
+        }
+
+        .tolerance-stats {
+            font-size: 0.8em;
+            color: #d1d5db;
+        }
+
+        .tolerance-stats .status {
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        .tolerance-stats .status.pass {
+            color: #10b981;
+        }
+
+        .tolerance-stats .status.fail {
+            color: #ef4444;
+        }
+
+        .data-tables {
+            display: grid;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .data-table {
+            background: linear-gradient(145deg, #2a2a3a, #36364d);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .table-header {
+            color: #60a5fa;
+            font-size: clamp(0.95em, 2vw, 1em);
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #60a5fa;
+            text-align: center;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .table-content {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: clamp(0.7em, 1.8vw, 0.8em);
+        }
+
+        th, td {
+            padding: 6px 10px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+        }
+
+        th {
+            background: linear-gradient(145deg, #4b5563, #6b7280);
+            color: #f3f4f6;
+            font-weight: bold;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        td {
+            background: linear-gradient(145deg, #374151, #4b5563);
+            color: #d1d5db;
+            transition: all 0.2s ease;
+        }
+
+        tr:hover td {
+            background: linear-gradient(145deg, #4b5563, #6b7280);
+            color: #f3f4f6;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .pass-cell {
+            background: linear-gradient(145deg, #065f46, #047857) !important;
+            color: white !important;
+        }
+
+        .fail-cell {
+            background: linear-gradient(145deg, #7f1d1d, #991b1b) !important;
+            color: white !important;
+        }
+
+        .fail-cell-light {
+            background: linear-gradient(145deg, #3d1010, #5a1a1a) !important;
+            color: #fca5a5 !important;
+        }
+
+        .legend-horizontal {
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+            padding: 10px 14px;
+            background: linear-gradient(145deg, rgba(42, 42, 58, 0.6), rgba(53, 53, 74, 0.6));
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #e2e8f0;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+
+            .summary-values {
+                grid-template-columns: 1fr;
+            }
+
+            .tolerance-indicators {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            }
+
+            table {
+                font-size: 0.65em;
+            }
+
+            th, td {
+                padding: 4px 6px;
+            }
+        }
+    </style>
 </head>
 <body>
-<main>
-  <h1>Linear Actuator</h1>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 Advanced Bolt Pattern Analyzer</h1>
+            <p>Precision bolt hole positioning with true position tolerance analysis</p>
+        </div>
 
-  <!-- Login -->
-  <div class="card" id="login">
-    <label>HiveMQ cluster URL</label>
-    <input id="host" placeholder="xxxxxxxx.s1.eu.hivemq.cloud" autocapitalize="off" autocorrect="off">
-    <label>Username</label>
-    <input id="user" autocapitalize="off" autocorrect="off">
-    <label>Password</label>
-    <input id="pass" type="password">
-    <label>Device ID</label>
-    <input id="dev" value="actuator1" autocapitalize="off" autocorrect="off">
-    <div class="row"><input type="checkbox" id="remember"> <span>Remember on this device</span></div>
-    <button class="connect" id="connectBtn">Connect</button>
-    <div class="small" id="loginMsg"></div>
-  </div>
+        <div class="main-content">
+            <div class="panel control-panel">
+                <div class="card">
+                    <h3>🔧 Basic Parameters</h3>
+                    <div class="input-row">
+                        <label>Number of Bolt Holes:</label>
+                        <input type="number" id="boltHoles" value="3" min="1" max="20">
+                    </div>
+                    <div class="input-row">
+                        <label>Bolt Circle Diameter:</label>
+                        <input type="number" id="bcd" value="5" step="0.001">
+                    </div>
+                    <div class="input-row">
+                        <label>True Position Tolerance:</label>
+                        <input type="number" id="truePosToleranceInput" value="0.0015" step="0.0001" min="0.0001">
+                        <div class="error-message" id="truePosError">Must be ≥ 0.0001</div>
+                    </div>
+                </div>
 
-  <!-- Controls -->
-  <div id="controls" hidden>
-    <div class="card">
-      <div class="status">
-        <span><span class="dot" id="brokerDot"></span>Cloud</span>
-        <span><span class="dot" id="devDot"></span><span id="devText">Device: ?</span></span>
-      </div>
-      <div id="state">—</div>
-      <div class="small" id="updated">&nbsp;</div>
+                <div class="card">
+                    <h3>⚙️ MMC Settings</h3>
+                    <div class="mmc-toggle">
+                        <button id="mmcButton" class="mmc-button">Enable MMC</button>
+                    </div>
+                    <div id="mmcSettings" class="mmc-settings">
+                        <div class="input-row">
+                            <label>Min Allowable Dia:</label>
+                            <input type="number" id="minDiameterTol" value="0.495" step="0.001">
+                            <div class="error-message" id="minDiameterError">Actual diameter is out-of-tolerance</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>📍 Actual Positions</h3>
+                    <div class="mmc-note" style="margin-top:0;margin-bottom:12px;padding-top:0;border-top:none;">
+                        Inputs are in each hole's local frame:<br>
+                        +Y is radial (outward), +X is tangential.<br>
+                        Nominal: X = 0.000, Y = BCD/2
+                    </div>
+                    <div id="positionsContainer" class="positions-grid">
+                        <!-- Position inputs will be generated here -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel visualization-panel">
+                <div class="results-summary">
+                    <h4>🎯 Analysis Summary</h4>
+                    <div class="summary-values">
+                        <div class="summary-item">
+                            <div class="label">Optimal Rotation</div>
+                            <div class="value" id="optimalRotation">0.0000°</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="label">All Holes Pass</div>
+                            <div class="value" id="allHolesPass">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="data-tables" id="dataTables">
+                    <!-- Tables will be generated here -->
+                </div>
+
+                <div class="export-bar">
+                    <button id="exportPdfButton" class="export-button">📄 Export Report PDF</button>
+                </div>
+            </div>
+
+            <!-- Hidden canvas kept for drawVisualization (used by PDF export) -->
+            <canvas id="visualization" width="800" height="600" style="display:none;"></canvas>
+
+            <div class="panel results-panel">
+                <h3>📊 True Position Analysis</h3>
+
+                <div class="legend-horizontal">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #3b82f6;"></div>
+                        <span>Nominal</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ef4444;"></div>
+                        <span>Actual</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #10b981;"></div>
+                        <span>Optimized Nominal</span>
+                    </div>
+                </div>
+
+                <div id="toleranceIndicators" class="tolerance-indicators">
+                    <!-- Tolerance indicators will be generated here -->
+                </div>
+            </div>
+        </div>
     </div>
-    <button class="e" data-cmd="extend">Hold to Extend</button>
-    <button class="r" data-cmd="retract">Hold to Retract</button>
-    <button class="s" id="stopBtn">Stop</button>
-    <button class="link" id="logout">Log out</button>
-  </div>
-</main>
 
-<script>
-const $ = id => document.getElementById(id);
-const KEY = 'actuatorLogin';
-let client = null, dev = 'actuator1';
+    <script>
+        class AdvancedBoltPatternAnalyzer {
+            constructor() {
+                this.boltHoles = 3;
+                this.bcd = 5;
+                this.truePosToleranceInput = 0.0015;
+                this.mmcEnabled = false;
+                this.minDiameterTol = parseFloat(document.getElementById('minDiameterTol').value);
+                
+                this.xActual = [0.0, -2.175, 2.164];
+                this.yActual = [2.502, -1.253, -1.245];
+                this.actualDiameters = [0.495, 0.500, 0.498];
+                
+                this.canvas = document.getElementById('visualization');
+                this.ctx = this.canvas.getContext('2d');
+                
+                this.setupEventListeners();
+                this.updatePositionInputs();
+                this.calculate();
+            }
 
-// Load saved login (optional convenience; never required)
-try {
-  const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
-  if (saved) { $('host').value = saved.host; $('user').value = saved.user; $('pass').value = saved.pass; $('dev').value = saved.dev; $('remember').checked = true; }
-} catch (e) {}
+            setupEventListeners() {
+                document.getElementById('boltHoles').addEventListener('input', () => {
+                    const oldBoltHoles = this.boltHoles;
+                    this.boltHoles = parseInt(document.getElementById('boltHoles').value) || 1;
+                    this.updateActualArrays(oldBoltHoles);
+                    this.updatePositionInputs();
+                    this.calculate();
+                });
 
-function setCmdEnabled(on) {
-  document.querySelectorAll('[data-cmd], #stopBtn').forEach(b => b.disabled = !on);
-  if (!on) endHold(false);
-}
+                document.getElementById('bcd').addEventListener('input', () => {
+                    this.bcd = parseFloat(document.getElementById('bcd').value) || 1;
+                    this.calculate();
+                });
 
-function send(cmd, qos) {
-  if (client && client.connected) client.publish(`${dev}/cmd`, cmd, { qos });
-}
+                document.getElementById('truePosToleranceInput').addEventListener('input', () => {
+                    this.validateTruePositionTolerance();
+                });
 
-// ---- Press-and-hold: repeat the command every 250 ms while held; send "stop" on release ----
-let holdTimer = null, heldBtn = null;
-function startHold(b) {
-  if (heldBtn || b.disabled) return;
-  heldBtn = b; b.classList.add('held');
-  send(b.dataset.cmd, 1);
-  holdTimer = setInterval(() => send(b.dataset.cmd, 0), 250);
-}
-function endHold(sendStop = true) {
-  if (!heldBtn) return;
-  clearInterval(holdTimer); holdTimer = null;
-  heldBtn.classList.remove('held'); heldBtn = null;
-  if (sendStop) send('stop', 1);
-}
+                document.getElementById('mmcButton').addEventListener('click', () => {
+                    this.toggleMMC();
+                });
 
-function connect() {
-  const host = $('host').value.trim(), user = $('user').value.trim(), pass = $('pass').value;
-  dev = $('dev').value.trim() || 'actuator1';
-  if (!host || !user || !pass) { $('loginMsg').textContent = 'Fill in all fields.'; return; }
+                document.getElementById('minDiameterTol').addEventListener('input', () => {
+                    this.validateMinDiameterTolerance();
+                });
 
-  try {
-    if ($('remember').checked) localStorage.setItem(KEY, JSON.stringify({ host, user, pass, dev }));
-    else localStorage.removeItem(KEY);
-  } catch (e) {}
+                document.getElementById('exportPdfButton').addEventListener('click', () => {
+                    this.exportPdfReport();
+                });
+            }
 
-  $('loginMsg').textContent = 'Connecting…';
-  if (client) client.end(true);
-  client = mqtt.connect(`wss://${host}:8884/mqtt`, {
-    username: user, password: pass,
-    clientId: 'web-' + Math.random().toString(16).slice(2, 10),
-    reconnectPeriod: 3000, connectTimeout: 10000, clean: true
-  });
+            validateTruePositionTolerance() {
+                const input = document.getElementById('truePosToleranceInput');
+                const errorDiv = document.getElementById('truePosError');
+                const value = parseFloat(input.value);
+                
+                if (isNaN(value) || value < 0.0001) {
+                    input.classList.add('error');
+                    errorDiv.style.display = 'block';
+                    return;
+                } else {
+                    input.classList.remove('error');
+                    errorDiv.style.display = 'none';
+                    this.truePosToleranceInput = value;
+                    this.calculate();
+                }
+            }
 
-  client.on('connect', () => {
-    $('login').hidden = true; $('controls').hidden = false; $('loginMsg').textContent = '';
-    $('brokerDot').className = 'dot on';
-    client.subscribe([`${dev}/state`, `${dev}/online`], { qos: 1 });
-  });
-  client.on('reconnect', () => { $('brokerDot').className = 'dot off'; setCmdEnabled(false); });
-  client.on('close',     () => { $('brokerDot').className = 'dot off'; setCmdEnabled(false); });
-  client.on('error', err => {
-    $('loginMsg').textContent = 'Error: ' + (err.message || err);
-    if (/auth|Not authorized|Bad user/i.test(err.message || '')) { client.end(true); $('login').hidden = false; $('controls').hidden = true; }
-  });
-  client.on('message', (topic, payload) => {
-    const msg = payload.toString();
-    if (topic === `${dev}/online`) {
-      const on = msg === 'online';
-      $('devDot').className = 'dot ' + (on ? 'on' : 'off');
-      $('devText').textContent = 'Device: ' + (on ? 'online' : 'offline');
-      setCmdEnabled(on);
-    } else if (topic === `${dev}/state`) {
-      $('state').textContent = msg;
-      $('updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
-    }
-  });
-}
+            validateMinDiameterTolerance() {
+                const input = document.getElementById('minDiameterTol');
+                const errorDiv = document.getElementById('minDiameterError');
+                const value = parseFloat(input.value);
+                
+                if (isNaN(value) || value <= 0) {
+                    input.classList.add('error');
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = 'Must be greater than 0';
+                    return;
+                }
 
-document.querySelectorAll('[data-cmd]').forEach(b => {
-  b.addEventListener('pointerdown', e => { e.preventDefault(); b.setPointerCapture(e.pointerId); startHold(b); });
-  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => b.addEventListener(ev, () => endHold()));
-  b.addEventListener('contextmenu', e => e.preventDefault());
-});
-$('stopBtn').addEventListener('click', () => { endHold(false); send('stop', 1); });
-// Safety: stop if the page is hidden, the phone locks, or the window loses focus
-document.addEventListener('visibilitychange', () => { if (document.hidden) endHold(); });
-window.addEventListener('blur', () => endHold());
-$('connectBtn').addEventListener('click', connect);
-$('logout').addEventListener('click', () => {
-  if (client) client.end(true);
-  try { localStorage.removeItem(KEY); } catch (e) {}
-  $('pass').value = ''; $('remember').checked = false;
-  $('controls').hidden = true; $('login').hidden = false;
-});
-setCmdEnabled(false);
+                let minHoleDiameter = Infinity;
+                for (let i = 0; i < this.actualDiameters.length; i++) {
+                    minHoleDiameter = Math.min(minHoleDiameter, this.actualDiameters[i]);
+                }
 
-// Auto-connect if login was saved
-if ($('remember').checked) connect();
-</script>
+                if (value > minHoleDiameter) {
+                    input.classList.add('error');
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = 'Actual diameter is out-of-tolerance';
+                    return;
+                }
+
+                input.classList.remove('error');
+                errorDiv.style.display = 'none';
+                this.minDiameterTol = value;
+                this.calculate();
+            }
+
+            validateHoleDiameter(holeIndex) {
+                const input = document.getElementById(`d${holeIndex}`);
+                if (!input) return;
+                
+                const value = parseFloat(input.value);
+                
+                if (isNaN(value) || value <= 0) {
+                    input.classList.add('error');
+                    return;
+                }
+
+                if (value < this.minDiameterTol) {
+                    input.classList.add('error');
+                    input.value = this.minDiameterTol.toFixed(3);
+                    this.actualDiameters[holeIndex] = this.minDiameterTol;
+                    
+                    setTimeout(() => {
+                        input.classList.remove('error');
+                    }, 1500);
+                } else {
+                    input.classList.remove('error');
+                    this.actualDiameters[holeIndex] = value;
+                }
+                
+                this.validateMinDiameterTolerance();
+                this.calculate();
+            }
+
+            toggleMMC() {
+                this.mmcEnabled = !this.mmcEnabled;
+                const button = document.getElementById('mmcButton');
+                const settings = document.getElementById('mmcSettings');
+                
+                if (this.mmcEnabled) {
+                    button.textContent = 'Disable MMC';
+                    settings.classList.add('visible');
+                } else {
+                    button.textContent = 'Enable MMC';
+                    settings.classList.remove('visible');
+                }
+                
+                this.updatePositionInputs();
+                this.validateMinDiameterTolerance();
+                this.calculate();
+            }
+
+            resizeCanvas() {
+                const container = this.canvas.parentElement;
+                const displayWidth = Math.floor(container.clientWidth - 40);
+                const displayHeight = Math.floor(container.clientHeight - 40);
+                
+                this.canvas.width = displayWidth;
+                this.canvas.height = displayHeight;
+                
+                const dpr = window.devicePixelRatio || 1;
+                this.canvas.width = displayWidth * dpr;
+                this.canvas.height = displayHeight * dpr;
+                this.canvas.style.width = displayWidth + 'px';
+                this.canvas.style.height = displayHeight + 'px';
+                
+                this.ctx.scale(dpr, dpr);
+                
+                if (this.xNominal) this.drawVisualization();
+            }
+
+            // Coordinate transforms between each hole's local frame and the global frame.
+            // For hole i with nominal angle θᵢ = i*360/N + 90 (degrees, measured from +X axis):
+            //   - Local +Y points radially outward (toward the hole's nominal position).
+            //   - Local +X is tangential (rotated -90° from local +Y; right-handed frame).
+            // Nominally, every hole's local position is (0, BCD/2).
+            getNominalAngleRad(holeIndex) {
+                return (holeIndex * 360 / this.boltHoles + 90) * Math.PI / 180;
+            }
+
+            localToGlobal(holeIndex, xLocal, yLocal) {
+                const theta = this.getNominalAngleRad(holeIndex);
+                const s = Math.sin(theta);
+                const c = Math.cos(theta);
+                return {
+                    x: xLocal * s + yLocal * c,
+                    y: -xLocal * c + yLocal * s
+                };
+            }
+
+            globalToLocal(holeIndex, xGlobal, yGlobal) {
+                const theta = this.getNominalAngleRad(holeIndex);
+                const s = Math.sin(theta);
+                const c = Math.cos(theta);
+                return {
+                    x: xGlobal * s - yGlobal * c,
+                    y: xGlobal * c + yGlobal * s
+                };
+            }
+
+            updateActualArrays(oldBoltHoles) {
+                const currentLength = this.xActual.length;
+                const newN = this.boltHoles;
+                const oldN = oldBoltHoles || currentLength;
+
+                // If the nominal hole spacing changed (i.e. N changed), each existing hole's
+                // local-frame inputs (tangential X, radial Y) should be preserved, not its
+                // absolute global position. Reproject: old global -> old local -> new global.
+                if (oldN !== newN && currentLength > 0) {
+                    const retained = Math.min(currentLength, newN);
+                    for (let i = 0; i < retained; i++) {
+                        // Old local frame: angle uses oldN.
+                        const oldTheta = (i * 360 / oldN + 90) * Math.PI / 180;
+                        const sOld = Math.sin(oldTheta), cOld = Math.cos(oldTheta);
+                        const xL = this.xActual[i] * sOld - this.yActual[i] * cOld;
+                        const yL = this.xActual[i] * cOld + this.yActual[i] * sOld;
+
+                        // New global from new local frame (uses newN via getNominalAngleRad).
+                        const newG = this.localToGlobal(i, xL, yL);
+                        this.xActual[i] = newG.x;
+                        this.yActual[i] = newG.y;
+                    }
+                }
+
+                if (newN > currentLength) {
+                    for (let i = currentLength; i < newN; i++) {
+                        // Default new holes to nominal position: local (0, BCD/2),
+                        // i.e., exactly on the bolt circle at their new nominal angle.
+                        const theta = (i * 360 / newN + 90) * Math.PI / 180;
+                        const r = this.bcd / 2;
+                        this.xActual.push(r * Math.cos(theta));
+                        this.yActual.push(r * Math.sin(theta));
+                        this.actualDiameters.push(0.5);
+                    }
+                } else if (newN < currentLength) {
+                    this.xActual = this.xActual.slice(0, newN);
+                    this.yActual = this.yActual.slice(0, newN);
+                    this.actualDiameters = this.actualDiameters.slice(0, newN);
+                }
+            }
+
+            updatePositionInputs() {
+                const container = document.getElementById('positionsContainer');
+
+                // Snapshot whatever the user has typed in the existing inputs before
+                // destroying the DOM. This is the source of truth for X/Y — not the
+                // internal globals, which suffer float round-trip error on local↔global
+                // conversion and would cause displayed values to shift on MMC toggle.
+                const savedLocal = [];
+                for (let i = 0; i < this.boltHoles; i++) {
+                    const xEl = document.getElementById(`x${i}`);
+                    const yEl = document.getElementById(`y${i}`);
+                    if (xEl && yEl) {
+                        // User's exact typed values exist — use them verbatim.
+                        savedLocal.push({
+                            x: xEl.value,
+                            y: yEl.value,
+                            xNum: parseFloat(xEl.value) || 0,
+                            yNum: parseFloat(yEl.value) || 0
+                        });
+                    } else {
+                        // First render or new hole — derive from internal globals.
+                        const local = this.globalToLocal(i, this.xActual[i], this.yActual[i]);
+                        const xStr = local.x.toFixed(3);
+                        const yStr = local.y.toFixed(3);
+                        savedLocal.push({
+                            x: xStr,
+                            y: yStr,
+                            xNum: parseFloat(xStr),
+                            yNum: parseFloat(yStr)
+                        });
+                    }
+                }
+
+                // Write the saved local values back to globals so internal state stays
+                // consistent with what is displayed (avoids any accumulated drift).
+                for (let i = 0; i < this.boltHoles; i++) {
+                    const g = this.localToGlobal(i, savedLocal[i].xNum, savedLocal[i].yNum);
+                    this.xActual[i] = g.x;
+                    this.yActual[i] = g.y;
+                }
+
+                container.innerHTML = '';
+
+                for (let i = 0; i < this.boltHoles; i++) {
+                    const holeDiv = document.createElement('div');
+                    holeDiv.className = 'hole-inputs';
+
+                    const diameterInputs = this.mmcEnabled ?
+                        `<div>
+                            <label>Actual Diameter:</label>
+                            <input type="number" id="d${i}" value="${this.actualDiameters[i].toFixed(3)}" step="0.001" min="0.001">
+                        </div>` :
+                        ``;
+
+                    holeDiv.innerHTML = `
+                        <h4>🔩 Hole ${i + 1}</h4>
+                        <div class="coordinate-inputs">
+                            <div>
+                                <label>X (tangential):</label>
+                                <input type="number" id="x${i}" value="${savedLocal[i].x}" step="0.001">
+                            </div>
+                            <div>
+                                <label>Y (radial):</label>
+                                <input type="number" id="y${i}" value="${savedLocal[i].y}" step="0.001">
+                            </div>
+                            ${diameterInputs}
+                        </div>
+                    `;
+                    container.appendChild(holeDiv);
+
+                    const updateFromLocal = () => {
+                        const xL = parseFloat(document.getElementById(`x${i}`).value) || 0;
+                        const yL = parseFloat(document.getElementById(`y${i}`).value) || 0;
+                        const g = this.localToGlobal(i, xL, yL);
+                        this.xActual[i] = g.x;
+                        this.yActual[i] = g.y;
+                        this.calculate();
+                    };
+
+                    document.getElementById(`x${i}`).addEventListener('input', updateFromLocal);
+                    document.getElementById(`y${i}`).addEventListener('input', updateFromLocal);
+
+                    if (this.mmcEnabled) {
+                        document.getElementById(`d${i}`).addEventListener('input', () => {
+                            this.validateHoleDiameter(i);
+                        });
+                    }
+                }
+            }
+
+            calculate() {
+                try {
+                    if (this.truePosToleranceInput < 0.0001) {
+                        console.warn('True position tolerance too small, skipping calculation');
+                        return;
+                    }
+
+                    this.xNominal = [];
+                    this.yNominal = [];
+                    
+                    for (let i = 0; i < this.boltHoles; i++) {
+                        const nominalAngle = i * 360 / this.boltHoles + 90;
+                        const x = 0.5 * this.bcd * Math.cos(nominalAngle * Math.PI / 180);
+                        const y = 0.5 * this.bcd * Math.sin(nominalAngle * Math.PI / 180);
+                        this.xNominal.push(x);
+                        this.yNominal.push(y);
+                    }
+
+                    this.optimalAngle = this.findOptimalRotation();
+                    this.holeResults = this.calculateHoleResults();
+
+                    this.displayResults();
+                    this.drawVisualization();
+                    this.updateToleranceIndicators();
+
+                } catch (error) {
+                    console.error('Calculation error:', error);
+                }
+            }
+
+            findOptimalRotation() {
+                let bestAngle = 0;
+                let minDistance = Infinity;
+                
+                for (let angle = 0; angle < 360; angle += 0.1) {
+                    const distance = this.calculateMaxDeviation(angle);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        bestAngle = angle;
+                    }
+                }
+                
+                const searchRange = 1.0;
+                const step = 0.001;
+                for (let angle = bestAngle - searchRange; angle <= bestAngle + searchRange; angle += step) {
+                    const distance = this.calculateMaxDeviation(angle);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        bestAngle = angle;
+                    }
+                }
+                
+                return bestAngle;
+            }
+
+            calculateMaxDeviation(rotationAngle) {
+                let maxDeviation = 0;
+                
+                for (let i = 0; i < this.boltHoles; i++) {
+                    const deviation = this.calculateDeviation(i, rotationAngle);
+                    maxDeviation = Math.max(maxDeviation, deviation);
+                }
+                
+                return maxDeviation;
+            }
+
+            calculateDeviation(holeIndex, rotationAngle = 0) {
+                const nominalAngle = holeIndex * 360 / this.boltHoles + 90;
+                const rotatedAngle = nominalAngle + rotationAngle;
+                
+                const xNominalRotated = 0.5 * this.bcd * Math.cos(rotatedAngle * Math.PI / 180);
+                const yNominalRotated = 0.5 * this.bcd * Math.sin(rotatedAngle * Math.PI / 180);
+                
+                const deviation = 2 * Math.sqrt(
+                    Math.pow(xNominalRotated - this.xActual[holeIndex], 2) + 
+                    Math.pow(yNominalRotated - this.yActual[holeIndex], 2)
+                );
+                
+                return deviation;
+            }
+
+            getAvailableTolerance(holeIndex) {
+                let availableTolerance = this.truePosToleranceInput;
+                
+                if (this.mmcEnabled && holeIndex < this.actualDiameters.length) {
+                    const bonusTolerance = this.actualDiameters[holeIndex] - this.minDiameterTol;
+                    availableTolerance += Math.max(bonusTolerance, 0);
+                }
+                
+                return Math.max(availableTolerance, 0.0001);
+            }
+
+            calculateHoleResults() {
+                const results = [];
+                
+                for (let i = 0; i < this.boltHoles; i++) {
+                    const deviationBefore = this.calculateDeviation(i, 0);
+                    const deviationAfter = this.calculateDeviation(i, this.optimalAngle);
+                    const availableTolerance = this.getAvailableTolerance(i);
+                    
+                    const bonusTolerance = this.mmcEnabled ? 
+                        Math.max(this.actualDiameters[i] - this.minDiameterTol, 0) : 0;
+                    
+                    const passesBefore = deviationBefore <= availableTolerance;
+                    const passesAfter = deviationAfter <= availableTolerance;
+                    
+                    results.push({
+                        holeNumber: i + 1,
+                        deviationBefore,
+                        deviationAfter,
+                        baseTolerance: this.truePosToleranceInput,
+                        bonusTolerance,
+                        availableTolerance,
+                        actualDiameter: this.actualDiameters[i],
+                        passesBefore,
+                        passesAfter,
+                        improvement: deviationBefore - deviationAfter
+                    });
+                }
+                
+                return results;
+            }
+
+            formatPercentage(value) {
+                const absValue = Math.abs(value);
+                if (absValue >= 1000) {
+                    return value.toExponential(3) + '%';
+                } else {
+                    return value.toFixed(4) + '%';
+                }
+            }
+
+            updateToleranceIndicators() {
+                const container = document.getElementById('toleranceIndicators');
+                container.innerHTML = '';
+
+                this.holeResults.forEach((result, index) => {
+                    const indicator = document.createElement('div');
+                    indicator.className = 'tolerance-indicator';
+                    
+                    const visual = this.createToleranceVisual(result);
+                    
+                    indicator.innerHTML = `
+                        <h5>Hole ${result.holeNumber}</h5>
+                        ${visual}
+                        <div class="tolerance-stats">
+                            <div class="status ${result.passesAfter ? 'pass' : 'fail'}">
+                                ${result.passesAfter ? '✓ PASS' : '✗ FAIL'}
+                            </div>
+                        </div>
+                    `;
+                    
+                    container.appendChild(indicator);
+                });
+            }
+
+            createToleranceVisual(result) {
+                const visualSize = 120;
+                const canvas = document.createElement('canvas');
+                canvas.width = visualSize;
+                canvas.height = visualSize;
+                canvas.style.width = visualSize + 'px';
+                canvas.style.height = visualSize + 'px';
+                canvas.style.borderRadius = '50%';
+                
+                const ctx = canvas.getContext('2d');
+                const centerX = visualSize / 2;
+                const centerY = visualSize / 2;
+                
+                const holeIndex = result.holeNumber - 1;
+                const nominalAngle = holeIndex * 360 / this.boltHoles + 90;
+                const optimizedAngle = nominalAngle + this.optimalAngle;
+                
+                const xNominalBefore = 0.5 * this.bcd * Math.cos(nominalAngle * Math.PI / 180);
+                const yNominalBefore = 0.5 * this.bcd * Math.sin(nominalAngle * Math.PI / 180);
+                const xNominalAfter = 0.5 * this.bcd * Math.cos(optimizedAngle * Math.PI / 180);
+                const yNominalAfter = 0.5 * this.bcd * Math.sin(optimizedAngle * Math.PI / 180);
+                
+                const xActual = this.xActual[holeIndex];
+                const yActual = this.yActual[holeIndex];
+                
+                const toleranceRadiusDisplay = 40;
+                
+                const fullTolerance = result.availableTolerance;
+                const safeTolerance = Math.max(fullTolerance, 0.0001);
+                
+                let positionScale = toleranceRadiusDisplay / safeTolerance;
+                
+                if (safeTolerance < 0.0001) {
+                    const maxScale = 1000;
+                    positionScale = Math.min(positionScale, maxScale);
+                }
+                
+                const actualRelativeX = xActual - xNominalAfter;
+                const actualRelativeY = yActual - yNominalAfter;
+                const originalNominalRelativeX = xNominalBefore - xNominalAfter;
+                const originalNominalRelativeY = yNominalBefore - yNominalAfter;
+                
+                const actualRelativeAngle = Math.atan2(actualRelativeY, actualRelativeX) * 180 / Math.PI;
+                const actualRelativeRadius = Math.sqrt(actualRelativeX * actualRelativeX + actualRelativeY * actualRelativeY);
+                
+                const transformedActualAngle = 90 - (actualRelativeAngle - nominalAngle);
+                
+                ctx.fillStyle = '#374151';
+                ctx.fillRect(0, 0, visualSize, visualSize);
+                
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([]);
+                ctx.beginPath();
+                ctx.moveTo(0, centerY);
+                ctx.lineTo(visualSize, centerY);
+                ctx.moveTo(centerX, 0);
+                ctx.lineTo(centerX, visualSize);
+                ctx.stroke();
+                
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.setLineDash([3, 3]);
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                const displayRadius = Math.max(toleranceRadiusDisplay, 5);
+                ctx.arc(centerX, centerY, displayRadius, 0, 2 * Math.PI);
+                ctx.stroke();
+                
+                if (actualRelativeRadius > 0) {
+                    const actualDeviation = 2 * actualRelativeRadius;
+                    const actualDisplayRadius = actualDeviation * positionScale;
+                    
+                    const maxRenderRadius = visualSize / 2 - 5;
+                    
+                    if (actualDisplayRadius <= maxRenderRadius) {
+                        const safeTransformedAngle = isNaN(transformedActualAngle) ? 0 : transformedActualAngle;
+                        const actualDisplayX = centerX + actualDisplayRadius * Math.cos(safeTransformedAngle * Math.PI / 180);
+                        const actualDisplayY = centerY - actualDisplayRadius * Math.sin(safeTransformedAngle * Math.PI / 180);
+                    
+                        const actualDistanceFromCenter = Math.sqrt(
+                            (actualDisplayX - centerX) * (actualDisplayX - centerX) +
+                            (actualDisplayY - centerY) * (actualDisplayY - centerY)
+                        );
+                        
+                        const frameRadius = visualSize / 2 - 10;
+                        
+                        if (actualDistanceFromCenter <= frameRadius) {
+                            ctx.strokeStyle = result.passesAfter ? '#10b981' : '#ef4444';
+                            ctx.setLineDash([1, 2]);
+                            ctx.lineWidth = 1;
+                            ctx.beginPath();
+                            ctx.moveTo(centerX, centerY);
+                            ctx.lineTo(actualDisplayX, actualDisplayY);
+                            ctx.stroke();
+                            
+                            ctx.fillStyle = '#ef4444';
+                            ctx.strokeStyle = '#ffffff';
+                            ctx.lineWidth = 1;
+                            ctx.setLineDash([]);
+                            ctx.beginPath();
+                            ctx.arc(actualDisplayX, actualDisplayY, 5, 0, 2 * Math.PI);
+                            ctx.fill();
+                            ctx.stroke();
+                        } else {
+                            const angle = Math.atan2(actualDisplayY - centerY, actualDisplayX - centerX);
+                            const edgeX = centerX + frameRadius * Math.cos(angle);
+                            const edgeY = centerY + frameRadius * Math.sin(angle);
+                            
+                            ctx.strokeStyle = '#ef4444';
+                            ctx.setLineDash([1, 2]);
+                            ctx.lineWidth = 1;
+                            ctx.beginPath();
+                            ctx.moveTo(centerX, centerY);
+                            ctx.lineTo(edgeX, edgeY);
+                            ctx.stroke();
+                            
+                            const arrowLength = 8;
+                            const arrowAngle = Math.PI / 6;
+                            
+                            ctx.strokeStyle = '#ef4444';
+                            ctx.setLineDash([]);
+                            ctx.lineWidth = 2;
+                            ctx.beginPath();
+                            ctx.moveTo(edgeX, edgeY);
+                            ctx.lineTo(
+                                edgeX - arrowLength * Math.cos(angle - arrowAngle),
+                                edgeY - arrowLength * Math.sin(angle - arrowAngle)
+                            );
+                            ctx.moveTo(edgeX, edgeY);
+                            ctx.lineTo(
+                                edgeX - arrowLength * Math.cos(angle + arrowAngle),
+                                edgeY - arrowLength * Math.sin(angle + arrowAngle)
+                            );
+                            ctx.stroke();
+                        }
+                    }
+                }
+                
+                if (Math.abs(this.optimalAngle) > 0.01) {
+                    const originalNominalRelativeRadius = Math.sqrt(originalNominalRelativeX * originalNominalRelativeX + originalNominalRelativeY * originalNominalRelativeY);
+
+                    if (originalNominalRelativeRadius > 0) {
+                        const originalNominalRelativeAngle = Math.atan2(originalNominalRelativeY, originalNominalRelativeX) * 180 / Math.PI;
+                        const transformedOriginalNominalAngle = 90 - (originalNominalRelativeAngle - nominalAngle);
+                        const safeAngle = isNaN(transformedOriginalNominalAngle) ? 0 : transformedOriginalNominalAngle;
+
+                        // The original-nominal displacement is purely a function of the
+                        // rotation angle × BCD/2 — it lives in a completely different
+                        // magnitude range than the positional tolerance, so scaling it by
+                        // positionScale always overflows the canvas. Instead, draw it at a
+                        // fixed symbolic radius just outside the tolerance circle so the
+                        // direction is clear without distorting the scale.
+                        const blueDisplayRadius = toleranceRadiusDisplay + 12;
+                        const blueDisplayX = centerX + blueDisplayRadius * Math.cos(safeAngle * Math.PI / 180);
+                        const blueDisplayY = centerY - blueDisplayRadius * Math.sin(safeAngle * Math.PI / 180);
+
+                        ctx.strokeStyle = '#f59e0b';
+                        ctx.setLineDash([2, 2]);
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(centerX, centerY);
+                        ctx.lineTo(blueDisplayX, blueDisplayY);
+                        ctx.stroke();
+
+                        ctx.fillStyle = '#3b82f6';
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([]);
+                        ctx.beginPath();
+                        ctx.arc(blueDisplayX, blueDisplayY, 4, 0, 2 * Math.PI);
+                        ctx.fill();
+                        ctx.stroke();
+                    }
+                }
+                
+                ctx.fillStyle = '#10b981';
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([]);
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, 4, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+                
+                const dataURL = canvas.toDataURL();
+                return `
+                    <div class="tolerance-visual">
+                        <img src="${dataURL}" alt="Tolerance visualization for hole ${result.holeNumber}" style="width: 100%; height: 100%; border-radius: 50%;">
+                    </div>
+                `;
+            }
+
+            displayResults() {
+                document.getElementById('optimalRotation').textContent = `${this.optimalAngle.toFixed(4)}°`;
+                
+                const allPass = this.holeResults.every(result => result.passesAfter);
+                const allHolesPassElement = document.getElementById('allHolesPass');
+                const resultsSummary = document.querySelector('.results-summary');
+                
+                allHolesPassElement.textContent = allPass ? 'YES' : 'NO';
+                allHolesPassElement.style.color = allPass ? '#10b981' : '#ef4444';
+                
+                if (allPass) {
+                    resultsSummary.classList.remove('fail');
+                } else {
+                    resultsSummary.classList.add('fail');
+                }
+
+                const tablesContainer = document.getElementById('dataTables');
+                
+                const resultTable = this.createResultTable();
+                const comparisonTable = this.createComparisonTable();
+
+                tablesContainer.innerHTML = `
+                    <div class="data-table">
+                        <div class="table-header">🎯 Hole Analysis Results</div>
+                        <div class="table-content">${resultTable}</div>
+                    </div>
+                    <div class="data-table">
+                        <div class="table-header">📊 Before vs After Comparison</div>
+                        <div class="table-content">${comparisonTable}</div>
+                    </div>
+                `;
+            }
+
+            createResultTable() {
+                let table = '<table><thead><tr>';
+                table += '<th>Hole</th><th>Deviation</th><th>Base Tol</th>';
+                if (this.mmcEnabled) {
+                    table += '<th>MMC Bonus</th><th>Total Tol</th>';
+                }
+                table += '<th>Status</th></tr></thead><tbody>';
+
+                this.holeResults.forEach(result => {
+                    const statusClass = result.passesAfter ? 'pass-cell' : 'fail-cell';
+                    table += `<tr>`;
+                    table += `<td>${result.holeNumber}</td>`;
+                    table += `<td>${result.deviationAfter.toFixed(5)}</td>`;
+                    table += `<td>${result.baseTolerance.toFixed(5)}</td>`;
+                    
+                    if (this.mmcEnabled) {
+                        table += `<td>${result.bonusTolerance.toFixed(5)}</td>`;
+                        table += `<td>${result.availableTolerance.toFixed(5)}</td>`;
+                    }
+                    
+                    table += `<td class="${statusClass}">${result.passesAfter ? 'PASS' : 'FAIL'}</td>`;
+                    table += `</tr>`;
+                });
+
+                table += '</tbody></table>';
+                return table;
+            }
+
+            createComparisonTable() {
+                let table = '<table><thead><tr>';
+                table += '<th>Hole</th><th>Before Rotation</th><th>After Rotation</th><th>Improvement</th><th>% Better</th>';
+                table += '</tr></thead><tbody>';
+
+                this.holeResults.forEach(result => {
+                    const improvementPercent = ((result.improvement / result.deviationBefore) * 100);
+                    const beforeClass = result.passesBefore ? '' : ' class="fail-cell-light"';
+                    table += `<tr>`;
+                    table += `<td>${result.holeNumber}</td>`;
+                    table += `<td${beforeClass}>${result.deviationBefore.toFixed(5)}</td>`;
+                    table += `<td>${result.deviationAfter.toFixed(5)}</td>`;
+                    table += `<td>${result.improvement.toFixed(5)}</td>`;
+                    table += `<td>${this.formatPercentage(improvementPercent)}</td>`;
+                    table += `</tr>`;
+                });
+
+                table += '</tbody></table>';
+                return table;
+            }
+
+            exportPdfReport() {
+                const button = document.getElementById('exportPdfButton');
+                const originalText = button.textContent;
+                button.disabled = true;
+                button.textContent = '⏳ Generating...';
+
+                try {
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+
+                    const pageW = doc.internal.pageSize.getWidth();   // 612 pt
+                    const pageH = doc.internal.pageSize.getHeight();  // 792 pt
+                    const margin = 32;
+                    const contentW = pageW - 2 * margin;
+                    const colGap = 14;
+                    const colW = (contentW - colGap) / 2;
+
+                    // Colors
+                    const blue = [59, 130, 246];
+                    const darkBlue = [29, 78, 216];
+                    const green = [16, 185, 129];
+                    const red = [239, 68, 68];
+                    const gray = [107, 114, 128];
+                    const lightGray = [243, 244, 246];
+                    const textDark = [31, 41, 55];
+
+                    const allPass = this.holeResults.every(r => r.passesAfter);
+                    const now = new Date();
+                    const timestamp = now.toLocaleString();
+
+                    // Shared compact table styles
+                    const tableStyles = { fontSize: 8, cellPadding: 3, textColor: textDark, lineWidth: 0.3 };
+                    const headStyles = { fillColor: blue, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center', cellPadding: 3 };
+                    const altRowStyles = { fillColor: lightGray };
+
+                    // Section heading helper
+                    const sectionHeading = (text, yPos, width) => {
+                        doc.setFont('helvetica', 'bold');
+                        doc.setFontSize(10);
+                        doc.setTextColor(...textDark);
+                        doc.text(text, margin + (width === colW ? 0 : 0), yPos);
+                        doc.setDrawColor(...blue);
+                        doc.setLineWidth(0.8);
+                        doc.line(margin, yPos + 2.5, margin + width, yPos + 2.5);
+                    };
+                    const sectionHeadingAt = (text, xPos, yPos, width) => {
+                        doc.setFont('helvetica', 'bold');
+                        doc.setFontSize(10);
+                        doc.setTextColor(...textDark);
+                        doc.text(text, xPos, yPos);
+                        doc.setDrawColor(...blue);
+                        doc.setLineWidth(0.8);
+                        doc.line(xPos, yPos + 2.5, xPos + width, yPos + 2.5);
+                    };
+
+                    // ===== Header band =====
+                    doc.setFillColor(...darkBlue);
+                    doc.rect(0, 0, pageW, 56, 'F');
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(15);
+                    doc.text('Bolt Pattern Analysis Report', margin, 28);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(9);
+                    doc.text('True Position Tolerance Analysis with Optimal Rotation', margin, 44);
+                    doc.setFontSize(8);
+                    doc.text(`Generated: ${timestamp}`, pageW - margin, 44, { align: 'right' });
+
+                    let y = 70;
+
+                    // ===== Overall Result Banner =====
+                    const banner = allPass ? green : red;
+                    doc.setFillColor(...banner);
+                    doc.roundedRect(margin, y, contentW, 26, 4, 4, 'F');
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(12);
+                    doc.text(allPass ? 'RESULT: ALL HOLES PASS' : 'RESULT: ONE OR MORE HOLES FAIL',
+                             pageW / 2, y + 17, { align: 'center' });
+                    y += 36;
+
+                    // ===== Configuration & Summary (full width) =====
+                    sectionHeadingAt('Configuration & Summary', margin, y, contentW);
+                    y += 6;
+
+                    const passCount = this.holeResults.filter(r => r.passesAfter).length;
+                    const maxDevAfter = Math.max(...this.holeResults.map(r => r.deviationAfter));
+                    const maxDevBefore = Math.max(...this.holeResults.map(r => r.deviationBefore));
+
+                    const summaryRows = [
+                        ['Number of Bolt Holes', `${this.boltHoles}`],
+                        ['Bolt Circle Diameter', `${this.bcd.toFixed(4)}`],
+                        ['True Position Tolerance', `${this.truePosToleranceInput.toFixed(4)}`],
+                        ['MMC', this.mmcEnabled ? `Enabled (Min Ø MMC: ${this.minDiameterTol.toFixed(4)})` : 'Disabled'],
+                        ['Optimal Rotation', `${this.optimalAngle.toFixed(4)}°  (Alt: ${(this.optimalAngle - 360).toFixed(4)}°)`],
+                        ['Holes Passing', `${passCount} of ${this.boltHoles}`],
+                        ['Max Deviation (before rotation)', maxDevBefore.toFixed(5)],
+                        ['Max Deviation (after rotation)', maxDevAfter.toFixed(5)]
+                    ];
+
+                    doc.autoTable({
+                        startY: y,
+                        head: [['Parameter', 'Value']],
+                        body: summaryRows,
+                        theme: 'grid',
+                        margin: { left: margin, right: margin },
+                        styles: tableStyles,
+                        headStyles: headStyles,
+                        alternateRowStyles: altRowStyles,
+                        columnStyles: {
+                            0: { cellWidth: contentW * 0.45, fontStyle: 'bold' },
+                            1: { cellWidth: contentW * 0.55 }
+                        }
+                    });
+                    y = doc.lastAutoTable.finalY + 14;
+
+                    // ===== Measured Positions (full width, below summary) =====
+                    sectionHeadingAt('Measured Positions (Local Frame)', margin, y, contentW);
+                    y += 6;
+                    doc.setFont('helvetica', 'italic');
+                    doc.setFontSize(7);
+                    doc.setTextColor(...gray);
+                    doc.text(
+                        `Local frame: +Y radial (outward), +X tangential. Nominal: (0, BCD/2 = ${(this.bcd / 2).toFixed(4)}).`,
+                        margin, y + 4
+                    );
+                    y += 10;
+
+                    const inputHead = this.mmcEnabled
+                        ? [['Hole', 'X (tangential)', 'Y (radial)', 'Actual Diameter']]
+                        : [['Hole', 'X (tangential)', 'Y (radial)']];
+
+                    const inputBody = [];
+                    for (let i = 0; i < this.boltHoles; i++) {
+                        const local = this.globalToLocal(i, this.xActual[i], this.yActual[i]);
+                        const row = [`${i + 1}`, local.x.toFixed(4), local.y.toFixed(4)];
+                        if (this.mmcEnabled) row.push(this.actualDiameters[i].toFixed(4));
+                        inputBody.push(row);
+                    }
+
+                    doc.autoTable({
+                        startY: y,
+                        head: inputHead,
+                        body: inputBody,
+                        theme: 'grid',
+                        margin: { left: margin, right: margin },
+                        styles: { ...tableStyles, halign: 'center' },
+                        headStyles: headStyles,
+                        alternateRowStyles: altRowStyles
+                    });
+                    y = doc.lastAutoTable.finalY + 14;
+
+                    // ===== Hole Analysis Results (full width) =====
+                    sectionHeadingAt('Hole Analysis Results', margin, y, contentW);
+                    y += 6;
+
+                    const resultHead = this.mmcEnabled
+                        ? [['Hole', 'Deviation', 'Base Tol', 'MMC Bonus', 'Total Tol', 'Status']]
+                        : [['Hole', 'Deviation', 'Base Tol', 'Status']];
+
+                    const resultBody = this.holeResults.map(r => {
+                        const row = [
+                            `${r.holeNumber}`,
+                            r.deviationAfter.toFixed(5),
+                            r.baseTolerance.toFixed(5)
+                        ];
+                        if (this.mmcEnabled) {
+                            row.push(r.bonusTolerance.toFixed(5));
+                            row.push(r.availableTolerance.toFixed(5));
+                        }
+                        row.push(r.passesAfter ? 'PASS' : 'FAIL');
+                        return row;
+                    });
+
+                    const statusColIdx = resultHead[0].length - 1;
+                    doc.autoTable({
+                        startY: y,
+                        head: resultHead,
+                        body: resultBody,
+                        theme: 'grid',
+                        margin: { left: margin, right: margin },
+                        styles: { ...tableStyles, halign: 'center' },
+                        headStyles: headStyles,
+                        alternateRowStyles: altRowStyles,
+                        didParseCell: (data) => {
+                            if (data.section === 'body' && data.column.index === statusColIdx) {
+                                const passing = data.cell.raw === 'PASS';
+                                data.cell.styles.fillColor = passing ? green : red;
+                                data.cell.styles.textColor = [255, 255, 255];
+                                data.cell.styles.fontStyle = 'bold';
+                            }
+                        }
+                    });
+                    y = doc.lastAutoTable.finalY + 14;
+
+                    // ===== Before vs After Comparison =====
+                    sectionHeadingAt('Before vs After Rotation', margin, y, contentW);
+                    y += 6;
+
+                    const compBody = this.holeResults.map(r => {
+                        const pct = r.deviationBefore > 0
+                            ? (r.improvement / r.deviationBefore) * 100
+                            : 0;
+                        return [
+                            `${r.holeNumber}`,
+                            r.deviationBefore.toFixed(5),
+                            r.deviationAfter.toFixed(5),
+                            r.improvement.toFixed(5),
+                            this.formatPercentage(pct)
+                        ];
+                    });
+
+                    doc.autoTable({
+                        startY: y,
+                        head: [['Hole', 'Before Rotation', 'After Rotation', 'Improvement', '% Better']],
+                        body: compBody,
+                        theme: 'grid',
+                        margin: { left: margin, right: margin },
+                        styles: { ...tableStyles, halign: 'center' },
+                        headStyles: headStyles,
+                        alternateRowStyles: altRowStyles
+                    });
+
+                    // ===== Single-page footer =====
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(7);
+                    doc.setTextColor(...gray);
+                    doc.setDrawColor(...gray);
+                    doc.setLineWidth(0.3);
+                    doc.line(margin, pageH - 24, pageW - margin, pageH - 24);
+                    doc.text('Advanced Bolt Pattern Analyzer', margin, pageH - 14);
+                    doc.text('Page 1 of 1', pageW - margin, pageH - 14, { align: 'right' });
+
+                    // If anything overflowed onto a second page, remove it so the report stays single-page.
+                    while (doc.internal.getNumberOfPages() > 1) {
+                        doc.deletePage(doc.internal.getNumberOfPages());
+                    }
+
+                    // Filename: include timestamp for uniqueness
+                    const pad = (n) => String(n).padStart(2, '0');
+                    const fname = `BoltPatternReport_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.pdf`;
+                    doc.save(fname);
+                } catch (err) {
+                    console.error('PDF export failed:', err);
+                    alert('PDF export failed: ' + err.message);
+                } finally {
+                    button.disabled = false;
+                    button.textContent = originalText;
+                }
+            }
+
+            drawVisualization() {
+                const displayWidth = parseInt(this.canvas.style.width);
+                const displayHeight = parseInt(this.canvas.style.height);
+                
+                this.ctx.clearRect(0, 0, displayWidth, displayHeight);
+
+                const allX = [...this.xActual, ...this.xNominal];
+                const allY = [...this.yActual, ...this.yNominal];
+                const maxCoord = Math.max(...allX.map(Math.abs), ...allY.map(Math.abs));
+                const maxR = Math.max(maxCoord, this.bcd / 2) * 1.3;
+
+                const centerX = displayWidth / 2;
+                const centerY = displayHeight / 2;
+                const scale = Math.min(displayWidth, displayHeight) / (2 * maxR) * 0.85;
+
+                this.drawGrid(centerX, centerY, scale, maxR, displayWidth, displayHeight);
+
+                const circleR = (this.bcd / 2) * scale;
+                this.ctx.strokeStyle = '#6b7280';
+                this.ctx.setLineDash([]);
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.arc(centerX, centerY, circleR, 0, 2 * Math.PI);
+                this.ctx.stroke();
+
+                this.ctx.fillStyle = '#6b7280';
+                this.ctx.setLineDash([]);
+                this.ctx.beginPath();
+                this.ctx.arc(centerX, centerY, 5, 0, 2 * Math.PI);
+                this.ctx.fill();
+
+                for (let i = 0; i < this.boltHoles; i++) {
+                    const nominalAngle = i * 360 / this.boltHoles + 90;
+                    const rotatedAngle = nominalAngle + this.optimalAngle;
+                    
+                    const cxNom = centerX + this.xNominal[i] * scale;
+                    const cyNom = centerY - this.yNominal[i] * scale;
+                    const cxAct = centerX + this.xActual[i] * scale;
+                    const cyAct = centerY - this.yActual[i] * scale;
+                    
+                    const cxOpt = centerX + (0.5 * this.bcd * Math.cos(rotatedAngle * Math.PI / 180)) * scale;
+                    const cyOpt = centerY - (0.5 * this.bcd * Math.sin(rotatedAngle * Math.PI / 180)) * scale;
+
+                    this.ctx.strokeStyle = '#f59e0b';
+                    this.ctx.setLineDash([]);
+                    this.ctx.lineWidth = 2;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(cxNom, cyNom);
+                    this.ctx.lineTo(cxOpt, cyOpt);
+                    this.ctx.stroke();
+
+                    this.ctx.strokeStyle = this.holeResults[i].passesAfter ? '#10b981' : '#ef4444';
+                    this.ctx.setLineDash([]);
+                    this.ctx.lineWidth = 1;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(cxOpt, cyOpt);
+                    this.ctx.lineTo(cxAct, cyAct);
+                    this.ctx.stroke();
+
+                    this.ctx.setLineDash([]);
+                    
+                    this.ctx.fillStyle = '#3b82f6';
+                    this.ctx.strokeStyle = '#f3f4f6';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.beginPath();
+                    this.ctx.arc(cxNom, cyNom, 8, 0, 2 * Math.PI);
+                    this.ctx.fill();
+                    this.ctx.stroke();
+
+                    this.ctx.fillStyle = '#ef4444';
+                    this.ctx.beginPath();
+                    this.ctx.arc(cxAct, cyAct, 8, 0, 2 * Math.PI);
+                    this.ctx.fill();
+                    this.ctx.stroke();
+
+                    this.ctx.fillStyle = '#10b981';
+                    this.ctx.beginPath();
+                    this.ctx.arc(cxOpt, cyOpt, 8, 0, 2 * Math.PI);
+                    this.ctx.fill();
+                    this.ctx.stroke();
+
+                    this.ctx.fillStyle = '#f3f4f6';
+                    this.ctx.font = 'bold 14px Inter';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText(`${i + 1}`, cxNom, cyNom - 22);
+                }
+            }
+
+            drawGrid(centerX, centerY, scale, maxR, displayWidth, displayHeight) {
+                const gridSpacing = maxR / 4;
+                this.ctx.strokeStyle = '#374151';
+                this.ctx.setLineDash([]);
+                this.ctx.lineWidth = 1;
+
+                for (let i = -4; i <= 4; i++) {
+                    const xPos = centerX + i * gridSpacing * scale;
+                    if (xPos >= 0 && xPos <= displayWidth) {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(xPos, 0);
+                        this.ctx.lineTo(xPos, displayHeight);
+                        this.ctx.stroke();
+                    }
+
+                    const yPos = centerY + i * gridSpacing * scale;
+                    if (yPos >= 0 && yPos <= displayHeight) {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(0, yPos);
+                        this.ctx.lineTo(displayWidth, yPos);
+                        this.ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new AdvancedBoltPatternAnalyzer();
+        });
+    </script>
 </body>
 </html>
